@@ -1,0 +1,17 @@
+suppressPackageStartupMessages(c(
+  library(fpp2),
+  library(data.table),
+  library(lubridate),
+  library(xts),
+  library(zoo),
+  library(magrittr),
+  library(plyr),
+  library(dplyr),
+  library(forecast),
+  library(forecastHybrid),
+  library(fma),
+  library(Metrics),
+  library(knitr),
+  library(signal),
+  library(seasonal),
+  library(ggpubr)))

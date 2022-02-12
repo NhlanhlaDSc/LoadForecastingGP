@@ -1,0 +1,185 @@
+---
+title: "Gauteng Load Forecasting using a Hybrid Model for Autoregressive Integrated Moving Average and Artificial Neural Network"
+author: "Nhlanhla Mthembu"
+date: "11/01/2022"
+output: html_notebook
+---
+```
+This notebook aims on forecasting electricity load for Gauteng where there are multiple economic activities. Most of national and international companies are have headquarter located in the province. These companies makes the profit by using various resources among others electricity is one of them. Electricity is very crucial in the era of the 4th industrial revolution to support economic activities. Due to that fact I'm motivated to do such load forecasting project as part of showcasing my skills. The project proceeds to the following sections; Data Wrangling & EDA, Model fitting & forecasting,Summary and result and Conclusion.
+```
+## Data Wrangling & Exporatory Data Analysis
+```
+```
+#### Loading the dataset  and date formating
+
+```{r load_dataset}
+electricity_gp = read.csv("electricity_load_gp.csv")
+electricity_gp$TIME <- as.POSIXct(strptime(electricity_gp$TIME, format = "%d-%m-%Y", tz = "GMT"))
+```
+
+#### Overview of the Gauteng Elececity Load form January 2002 to December 2021
+```{r ts_gp_plot}
+
+plot(electricity_gp$TIME, electricity_gp$CONSUMPTION, type = "l", xlab = "Time", ylab = "Electricity Load (GW)", main = "Gauteng Monthly Electricity Load")
+```
+```
+Based on the time series plot it can be seen that there are flactuatuins in the electricity load of Gauteng and there are multiple components in the data. The most noticable is that the data is not stationary and by inspection we can observer seaonality. In the next section we decompose the series to look close at varios components.
+```
+
+#### Creating time series object and Decomposition
+
+```{r}
+electricity_gp_ts <- ts(electricity_gp$CONSUMPTION, start = c(2002,01), frequency = 12)
+electricity_gp_ts %>% decompose(type="additive") %>%
+  autoplot() + xlab("Time") +
+  ggtitle("Time Series Decomposition: Electrictity Load Data for Gauteng") +
+  theme_bw()
+```
+```
+The decomposed time series shows; on row 1: original series ,row 2: Trend component, row 3: seasonal component and the last row is the remainder which is assumed to be a white noise with normal distribution. Now we know data is not stationary due to presense of a trend component, in the next section we display differnced version of the series, this is neccesary for forecasting ARIMA models
+
+```
+
+```{r}
+plot(diff(electricity_gp_ts), main="Gauteng Monthly Electricity Load (Differenced)",xlab="Time", ylab="Electricity Load (GW)")
+```
+### Train-Test Split 
+``` 
+The dataset will be splitted into 80:20 ratio. The 80% will be used for traing model and 20% Testing, There are 240 observatons hence the first 192 observations will be used for training and remaining 48 will be used for testing. This also implies that electricity load for 48 Months will be predicted
+
+```
+
+```{r train-test-split}
+train_ec <- electricity_gp[1:192,]
+electricity_gp_train <- ts(train_ec$CONSUMPTION, start = c(2002,01), end = c(2017,12), frequency = 12 )
+test_ec <- electricity_gp[193:240,]
+electricity_gp_test <- ts(test_ec$CONSUMPTION, start = c(2018,01), end = c(2021,12), frequency = 12 )
+```
+## Model Fitting
+
+### ARIMA model (Classical Statistical Model)
+```{r arima_fitting}
+Model_ARIMA <- auto.arima(electricity_gp_train, lambda = 0, biasadj = T) #Model Fitting
+Model_ARIMA
+```
+```
+The fiited model is ARIMA(0,1,1) with AIC of -801.05, below we perfom the foract using the fitted model
+```
+```{r arima_forecast}
+Model_ARIMA_forecast <- forecast(Model_ARIMA,h = 48)
+```
+
+```{r arima_autolot}
+autoplot(Model_ARIMA_forecast)+
+  autolayer(fitted(Model_ARIMA_forecast), series = "Fitted")+
+  xlab("Time") + ylab("Elecricity Load (GW)") +
+  ggtitle("Gauteng Electricity Load: ARIMA forecasts") +
+  theme_bw()
+
+```
+```
+The above plot shows original series from training set,fiited series and predicted series with it's coresponding 80% and 95% Confidence Intervals. Below we visualize relationshio between actual values and forecasted values based on test dataset.
+```
+```{r arima_scatter}
+predicted_arima <- as.numeric(Model_ARIMA_forecast$mean) #extracting forecasts from the model
+actual_values <- test_ec$CONSUMPTION
+AR_df <- data.frame(actual_values,predicted_arima) 
+colnames(AR_df) <-c("Actual Load","Predicted Load")
+
+ggscatter(AR_df, x="Actual Load", y="Predicted Load" , add = "reg.line", title = "Actual vs Predicted electricity load: ARIMA Model",conf.int = T, cor.coef = T, cor.method = "pearson")+
+  theme_bw()
+```
+### ANN (Machine Learning Model)
+
+```{r ann_fitting}
+Model_ANN <- nnetar(electricity_gp_train) #Model Fitting
+Model_ANN
+```
+```
+The fiited model is a 4-2-1 network with 13 weights, below we perform the forecat using the fitted ANN model
+```
+```{r ann_forecast}
+Model_ANN_forecast <- forecast(Model_ANN, PI=T, h = 48)
+```
+
+```{r ann_autoplot}
+autoplot(Model_ANN_forecast)+
+  autolayer(fitted(Model_ANN_forecast), series = "Fitted")+
+  xlab("Time") + ylab("Elecricity Load (GW)") +
+  ggtitle("Gauteng Electricity Load: ANN forecasts") +
+  theme_bw()
+
+```
+```
+The above plot shows original series from training set,fiited series and predicted series with it's coresponding 80% and 95% Confidence Intervals. Below we visualize relationshio between actual values and forecasted values based on test dataset.
+```
+```{r ann_scatter} 
+predicted_ann <- as.numeric(Model_ANN_forecast$mean) #extracting forecasts from the model
+actual_values <- test_ec$CONSUMPTION
+ANN_df <- data.frame(actual_values,predicted_ann) 
+colnames(ANN_df) <-c("Actual Load","Predicted Load")
+
+ggscatter(ANN_df, x="Actual Load", y="Predicted Load" , add = "reg.line", title = "Actual vs Predicted electricity load: ANN Model",conf.int = T, cor.coef = T, cor.method = "pearson")+
+  theme_bw()
+```
+
+### Hybrid ARIMA + ANN (Combination of Statistical and Machine Learning Models)
+```{r hybrid_fitting}
+Model_HYBD <- hybridModel( y = electricity_gp_train,
+                                models = "na",
+                                n.args = list(repeats = 50, size = 25),
+                                a.args = list(lambda="auto", biasadj = TRUE, approximation=FALSE, parallel=F),
+                                errorMethod = "MASE") #Model Fitting with 50 iterations
+
+```
+```
+The fiited model is a 4-2-1 network with 13 weights, below we perform the forecat using the fitted ANN model
+```
+```{r hybrid_forecast}
+Model_HYBD_forecast <- forecast(Model_HYBD,PI=F, h = 48)
+```
+
+```{r hybrid_autoplot}
+autoplot(Model_HYBD_forecast)+
+  autolayer(fitted(Model_HYBD_forecast), series = "Fitted")+
+  xlab("Time") + ylab("Elecricity Load (GW)") +
+  ggtitle("Gauteng Electricity Load: HYBRID forecasts") +
+  theme_bw()
+
+```
+```
+The above plot shows original series from training set,fiited series and predicted series with it's coresponding 80% and 95% Confidence Intervals. Below we visualize relationshio between actual values and forecasted values based on test dataset.
+```
+```{r hybrid_scatter} 
+predicted_hybrid <- as.numeric(Model_HYBD_forecast$mean) #extracting forecasts from the model
+actual_values <- test_ec$CONSUMPTION
+HYBRID_df <- data.frame(actual_values,predicted_hybrid) 
+colnames(HYBRID_df) <-c("Actual Load","Predicted Load")
+
+ggscatter(HYBRID_df, x="Actual Load", y="Predicted Load" , add = "reg.line", title = "Actual vs Predicted electricity load: Hybrid Models",conf.int = T, cor.coef = T, cor.method = "pearson")+
+  theme_bw()
+```
+
+## Summary of Results
+### The Results are presented based on error metrics evaluted on test dataset
+```{r}
+mape_arima <- mape(AR_df$`Actual Load`,AR_df$`Predicted Load`) #MAPE for ARIMA
+mape_ann <- mape(ANN_df$`Actual Load`,ANN_df$`Predicted Load`) #MAPE for ANN
+mape_hybrid <- mape(HYBRID_df$`Actual Load`,HYBRID_df$`Predicted Load`) #MAPE for Hybrid
+
+error_df<-data.frame(c("ARIMA","ANN","HYBRID"),c(mape_arima,mape_ann,mape_hybrid)*100)
+colnames(error_df)<- c("Model","MAPE")
+
+kable(error_df,caption = "Summary of error Metrics")
+```
+
+```
+The Correlations for actual values vs model predicted values for ARIMA, ANN and hybrid models are 0.88, 0.90 and 0.27 respectively. It can be observed that based on MAPE ANN model perfom better than ARIMA and Hybrid models. This should not come as a suprise since the data have multiple components which includes cyclic component.
+
+```
+
+
+## Recommendations and Conclusion
+```
+This project fitted ARIMA, ANN and Hybrid models on Electricity load data for Gauteng, from results we noticed that  all MAPEs are grater than recommended limit for load forecasing which is 5%. The hybrid model cannot be recommended for Gauteng load forecasting since there are several componets in it. Originally the time series to be forecasted by this type of models is pre-assumed linearity and non-linearity. Hence the were many components thus thr hybrid models was not a success.
+```
