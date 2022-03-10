@@ -1,13 +1,25 @@
 ---
-title: "Gauteng Load Forecasting using a Hybrid Model for Autoregressive Integrated Moving Average and Artificial Neural Network"
+title: Gauteng Load Forecasting using a Hybrid Model for Autoregressive Integrated
+  Moving Average and Artificial Neural Network
 author: "Nhlanhla Mthembu"
 date: "11/01/2022"
-output: html_notebook
+output: html_document
 ---
+
+```{r setup, include=FALSE}
+options(width=300)
+#knitr::opts_chunk$set(echo = TRUE,out.width = 80, tidy=T, tidy.opts=list(width.cutoff=70))
+```
+
+```{r include=FALSE}
+source("load_packages.R")
+```
+
+
 ```
 This notebook aims on forecasting electricity load for Gauteng where there are multiple economic activities. Most of national and international companies are have headquarter located in the province. These companies makes the profit by using various resources among others electricity is one of them. Electricity is very crucial in the era of the 4th industrial revolution to support economic activities. Due to that fact I'm motivated to do such load forecasting project as part of showcasing my skills. The project proceeds to the following sections; Data Wrangling & EDA, Model fitting & forecasting,Summary and result and Conclusion.
 ```
-## Data Wrangling & Exporatory Data Analysis
+## Data Wrangling & Exploratory Data Analysis
 ```
 ```
 #### Loading the dataset  and date formating
@@ -28,7 +40,7 @@ Based on the time series plot it can be seen that there are flactuatuins in the 
 
 #### Creating time series object and Decomposition
 
-```{r}
+```{r decompose}
 electricity_gp_ts <- ts(electricity_gp$CONSUMPTION, start = c(2002,01), frequency = 12)
 electricity_gp_ts %>% decompose(type="additive") %>%
   autoplot() + xlab("Time") +
@@ -168,7 +180,7 @@ mape_ann <- mape(ANN_df$`Actual Load`,ANN_df$`Predicted Load`) #MAPE for ANN
 mape_hybrid <- mape(HYBRID_df$`Actual Load`,HYBRID_df$`Predicted Load`) #MAPE for Hybrid
 
 error_df<-data.frame(c("ARIMA","ANN","HYBRID"),c(mape_arima,mape_ann,mape_hybrid)*100)
-colnames(error_df)<- c("Model","MAPE")
+colnames(error_df)<- c("Model","MAPE (%)")
 
 kable(error_df,caption = "Summary of error Metrics")
 ```

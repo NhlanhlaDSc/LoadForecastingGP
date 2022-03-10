@@ -14,6 +14,8 @@ This project was inspired by an honors project I did in Statistics. The inspirat
 - Summary of Results.
 - Recommendations and Conclusion.
 
+Important Note: If you not familiar with R, you can focus on "presentation.pdf" as it complied version of the R markdown with no issues.
+
 You may now proceed to the project, Enjoy...
 
 Thank you.
